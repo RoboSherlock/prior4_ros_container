@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+
+# Written mainly for python2, as this client might be used 
+# to test the service calls from a older system with older ROS distribution
+from __future__ import print_function
+
+import sys
+import rospy
+import rospkg
+import cv2
+from noetic_im_proc_container.srv import *
+from cv_bridge import CvBridge, CvBridgeError
+from sensor_msgs.msg import Image
+from std_msgs.msg import String
+
+service_name = "/image_service"
+
+def image_service_client():
+    try:
+        # Load images from data dir
+        rospack = rospkg.RosPack()
+        package_path = rospack.get_path('noetic_im_proc_container')
+        data_path = package_path + '/data/'
+        cv_rgb_image = cv2.imread(data_path + 'test_rgb.png')
+        cv_depth_image = cv2.imread(data_path + 'test_depth.png',cv2.IMREAD_ANYDEPTH)
+        if cv_rgb_image is None:
+            print("Couldn't load cv_rgb_image at " + data_path)
+            sys.exit(1)
+        if cv_depth_image is None:
+            print("Couldn't load cv_depth_image" + data_path)
+            sys.exit(1)
+
+        print(cv_depth_image.dtype)
+        print(cv_depth_image.size)
+        bridge = CvBridge()
+        ros_rgb_image = None
+        ros_depth_image = None
+        try:
+            ros_rgb_image = bridge.cv2_to_imgmsg(cv_rgb_image, encoding="passthrough")
+            ros_depth_image = bridge.cv2_to_imgmsg(cv_depth_image, encoding="passthrough" )
+        except CvBridgeError as e:
+            print(e)
+
+        str_msg = String("description")
+
+        print("Waiting for service to come up...")
+        rospy.wait_for_service(service_name)
+        im_service_client = rospy.ServiceProxy(service_name, ImageService)
+        print("Calling service")
+        response = im_service_client(ros_rgb_image, ros_depth_image, str_msg)
+        return response.success
+    except rospy.ServiceException as e:
+        print("Service call failed: %s"%e)
+
+if __name__ == "__main__":
+    print("Sending service request to " + service_name)
+    image_service_client()

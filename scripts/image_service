@@ -7,6 +7,9 @@ from noetic_im_proc_container.srv import ImageService,ImageServiceResponse
 from sensor_msgs.msg import RegionOfInterest
 from geometry_msgs.msg import Pose
 
+from cv_bridge import CvBridge, CvBridgeError
+import cv2
+
 def shutdown_hook():
   print("Shutting down node")
 
@@ -14,16 +17,66 @@ def shutdown_hook():
 def handle_service_request(req):
     """This method is called when a service request is received"""
     print("Received image processing request")
-    print(req)
+    print(req.description.data)
+    # print(req) # if you want to output the full result
+
+    # Load data from service request
+    ros_rgb_image   = req.rgb
+    ros_depth_image = req.depth
+    description     = req.description.data
+
+    # Convert images to openCV
+    cv_rgb_image   = None
+    cv_depth_image = None
+    bridge = CvBridge()
+    try:
+      # cv_rgb_image = bridge.imgmsg_to_cv2(ros_rgb_image, encoding = "passthrough")
+      # cv_depth_image = bridge.imgmsg_to_cv2(ros_depth_image, encoding = "passthrough")
+      cv_rgb_image = bridge.imgmsg_to_cv2(ros_rgb_image)
+      cv_depth_image = bridge.imgmsg_to_cv2(ros_depth_image)
+    except CvBridgeError as e:
+      print(e)
+      return
+    (rows,cols,channels) = cv_rgb_image.shape
+    print(f'RGB image parameters (rows,cols,channels,pixels,type): {rows}, {cols}, {channels}, {cv_rgb_image.size}, {cv_rgb_image.dtype}')
+    (rows,cols) = cv_depth_image.shape
+    print(f'Depth image parameters (rows,cols,pixels,type): {rows}, {cols}, {cv_depth_image.size}, {cv_depth_image.dtype}')
+
+    # Write out the images for testing purposes
+    print(cv2.imwrite("/home/catkin_ws/src/noetic_im_proc_container/rgb_out.png", cv_rgb_image))
+    print(cv2.imwrite("/home/catkin_ws/src/noetic_im_proc_container/depth_out.png", cv_depth_image))
+
+
+
+
+
+    ##################################
+    # Here you can call your code to #
+    # analyze the image              #
+    ##################################
+
+
+
+
+
+
+    #################################
+    # Creating the service response #
+    #################################
     response = ImageServiceResponse()
     response.success = True
+
     # x,y, height, width, (do_rectify)
     response.bounding_boxes = [RegionOfInterest(1,2,3,4,False)]
+
     response.class_ids = [0,1]
     response.class_confidences = [0.5, 0.5]
-    # response.segmentation_mask = TODO
 
-    # x,y,z; quat x,y,z,w
+    # TODO insert your own openCV mat here that you want to return
+    ros_segmentation_image = bridge.cv2_to_imgmsg(cv_rgb_image, encoding="passthrough")
+    response.segmentation_mask = ros_segmentation_image
+
+    # Instantiate and fill a pose
     p1 = Pose()
     p1.position.x = 1
     p1.position.y = 2
