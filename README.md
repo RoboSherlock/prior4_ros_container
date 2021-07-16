@@ -16,3 +16,11 @@ This enables you to run newer versions of ROS and/or python while isolating your
    source ~/.bashrc
    rosrun noetic_im_proc_container image_service
 ```
+
+## Testing the service
+This package also features a test client which loads a image from the filesystem into a openCV mat and sends it to the service.
+You can find it in `scripts/image_client_py2` and execute it like so:
+
+```
+rosrun noetic_im_proc_container image_client_py2
+```
