@@ -1,0 +1,21 @@
+sensor_msgs/Image rgb
+sensor_msgs/Image depth
+std_msgs/String description
+---
+bool success
+
+# A list of bounding boxes for all detected objects
+sensor_msgs/RegionOfInterest[] bounding_boxes
+
+# Class IDs for each entry in bounding_boxes
+int32[] class_ids
+
+# Class confidence for each entry in bounding_boxes
+float32[] class_confidences
+
+# The segmentation mask that has been used for object detection
+sensor_msgs/Image segmentation_mask
+
+# The best pose for each entry in bounding_boxes
+geometry_msgs/Pose[] pose_results
+

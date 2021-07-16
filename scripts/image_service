@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+## Simple image processing demo 
+
+import rospy
+from std_msgs.msg import String
+from noetic_im_proc_container.srv import ImageService,ImageServiceResponse
+from sensor_msgs.msg import RegionOfInterest
+from geometry_msgs.msg import Pose
+
+def shutdown_hook():
+  print("Shutting down node")
+
+
+def handle_service_request(req):
+    """This method is called when a service request is received"""
+    print("Received image processing request")
+    print(req)
+    response = ImageServiceResponse()
+    response.success = True
+    # x,y, height, width, (do_rectify)
+    response.bounding_boxes = [RegionOfInterest(1,2,3,4,False)]
+    response.class_ids = [0,1]
+    response.class_confidences = [0.5, 0.5]
+    # response.segmentation_mask = TODO
+
+    # x,y,z; quat x,y,z,w
+    p1 = Pose()
+    p1.position.x = 1
+    p1.position.y = 2
+    p1.position.z = 3
+    p1.orientation.x = 1
+    p1.orientation.y = 2
+    p1.orientation.z = 3
+    p1.orientation.w = 4
+
+    response.pose_results = [p1]
+    return response
+
+def image_service_server():
+    # pub = rospy.Publisher('chatter', String, queue_size=10)
+    rospy.init_node('image_service_node')
+    s = rospy.Service('image_service', ImageService, handle_service_request)
+    rospy.on_shutdown(shutdown_hook)
+    print("Ready to accept image processing requests")
+    rospy.spin()
+
+    # hello_str = "hello world %s" % rospy.get_time()
+    # rospy.loginfo(hello_str)
+
+if __name__ == '__main__':
+    try:
+        image_service_server()
+    except rospy.ROSInterruptException:
+        pass
