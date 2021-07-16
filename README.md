@@ -12,9 +12,9 @@ This enables you to run newer versions of ROS and/or python while isolating your
    sudo docker run --rm -it --network host ros_noetic_example
      or if you want to mount this ros package in the docker container directly (currently preferred)
    sudo docker run -v "$(pwd)":/home/catkin_ws/src/noetic_im_proc_container --rm -it --network host ros_noetic_example
-   catkin_make
-   source ~/.bashrc
-   rosrun noetic_im_proc_container image_service
+   catkin_make # in the docker container
+   source ~/.bashrc # in the docker container
+   rosrun noetic_im_proc_container image_service # in the docker container
 ```
 
 ## Testing the service
@@ -24,3 +24,4 @@ You can find it in `scripts/image_client_py2` and execute it like so:
 ```
 rosrun noetic_im_proc_container image_client_py2
 ```
+This script can be run on the host to verify that you can call the service in the docker container.
