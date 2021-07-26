@@ -18,6 +18,8 @@ This enables you to run newer versions of ROS and/or python while isolating your
 ```
 
 ## Testing the service
+
+### Basic test node
 This package also features a test client which loads a image from the filesystem into a openCV mat and sends it to the service.
 You can find it in `scripts/image_client_py2` and execute it like so:
 
@@ -25,3 +27,18 @@ You can find it in `scripts/image_client_py2` and execute it like so:
 rosrun noetic_im_proc_container image_client_py2
 ```
 This script can be run on the host to verify that you can call the service in the docker container.
+
+### Topic-based test node
+If you want to directly feed a ROS topic stream into the image service, you can find an example client `scripts/image_topic_client_py2`.
+This node reads a synchronized RGB and Depth image tuple and sends it to the service.
+You can use this node if you want to work directly on the camera streams of a robot or a bag file.
+It can be run with:
+```
+rosrun noetic_im_proc_container image_topic_client_py2
+```
+
+Important: If you work with bag files, please check that the type of your image streams is `sensor_msgs/Image` and not `sensor_msgs/CompressedImage`.
+Usually, we record bag files with `CompressedImage`s. In that case, you simply have to execute the following command to convert them:
+```
+roslaunch noetic_im_proc_container uncompress_and_throttle.launch 
+```
