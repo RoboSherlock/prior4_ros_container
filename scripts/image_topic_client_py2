@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+
+# Written mainly for python2, as this client might be used 
+# to test the service calls from a older system with older ROS distribution
+#
+# The difference to image_client_py2 is, that we read the images from a topic
+# instead of data images below data/
+
+from __future__ import print_function
+
+import sys
+import rospy
+import rospkg
+import cv2
+import message_filters
+from noetic_im_proc_container.srv import *
+from cv_bridge import CvBridge, CvBridgeError
+from sensor_msgs.msg import Image, CompressedImage
+from std_msgs.msg import String
+
+# OpenCV
+import cv2
+
+
+# If you start with the usual bag files we have for PR2 (compressed images for rgb and depth only), please start this command before running this script:
+#   roslaunch noetic_im_proc_container uncompress_and_throttle.launch
+#
+#   Rationale: In bag files, we only have compressed image. The compressed image decoding method from cvbridge fails to interpret the depth image.
+#              This is why we'll decode them first.
+
+
+service_name = "/image_service"
+rgb_topic = "/kinect_head/rgb/image_color/image_raw"
+depth_topic = "/kinect_head/depth_registered/image_raw"
+
+
+# def image_service_client():
+#     try:
+#         # Load images from data dir
+#         rospack = rospkg.RosPack()
+#         package_path = rospack.get_path('noetic_im_proc_container')
+#         data_path = package_path + '/data/'
+#         cv_rgb_image = cv2.imread(data_path + 'test_rgb.png')
+#         cv_depth_image = cv2.imread(data_path + 'test_depth.png',cv2.IMREAD_ANYDEPTH)
+#         if cv_rgb_image is None:
+#             print("Couldn't load cv_rgb_image at " + data_path)
+#             sys.exit(1)
+#         if cv_depth_image is None:
+#             print("Couldn't load cv_depth_image" + data_path)
+#             sys.exit(1)
+# 
+#         print(cv_depth_image.dtype)
+#         print(cv_depth_image.size)
+#         bridge = CvBridge()
+#         ros_rgb_image = None
+#         ros_depth_image = None
+#         try:
+#             ros_rgb_image = bridge.cv2_to_imgmsg(cv_rgb_image, encoding="passthrough")
+#             ros_depth_image = bridge.cv2_to_imgmsg(cv_depth_image, encoding="passthrough" )
+#         except CvBridgeError as e:
+#             print(e)
+# 
+#         str_msg = String("description")
+# 
+#         print("Waiting for service to come up...")
+#         rospy.wait_for_service(service_name)
+#         im_service_client = rospy.ServiceProxy(service_name, ImageService)
+#         print("Calling service")
+#         response = im_service_client(ros_rgb_image, ros_depth_image, str_msg)
+#         return response.success
+#     except rospy.ServiceException as e:
+#         print("Service call failed: %s"%e)
+# 
+# if __name__ == "__main__":
+#     print("Sending service request to " + service_name)
+#     image_service_client()
+
+class ImageTopicClient:
+    def __init__(self):
+        print("Waiting for "+ service_name +" service to come up...")
+        rospy.wait_for_service(service_name)
+        self.im_service_client = rospy.ServiceProxy(service_name, ImageService)
+
+        # Subscribe to the rgb and depth topics without a callback
+        self.rgb_subscriber = message_filters.Subscriber(rgb_topic,
+            Image)
+        self.depth_subscriber = message_filters.Subscriber(depth_topic,
+            Image)
+            # CompressedImage)#, self.callback,  queue_size = 1)
+
+        # Alternative: Subscribe with a normal subscriber if you don't need syncing abillities
+        # self.rgb_subscriber = rospy.Subscriber(rgb_topic,
+        #     CompressedImage, self.callback,  queue_size = 1)
+
+        # Setup a synchronizer to get (almost synchron) pairs of rgb + depth images
+        self.synchronizer = message_filters.ApproximateTimeSynchronizer([self.rgb_subscriber, self.depth_subscriber],queue_size=3, slop=0.5)
+        self.synchronizer.registerCallback(self.callback)
+        self.bridge = CvBridge()
+
+    def callback(self, rgb_msg, depth_msg):
+        print("Images received")
+        cv_rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding="passthrough")
+        cv_depth_image = self.bridge.imgmsg_to_cv2(depth_msg)
+        if cv_depth_image is None:
+            print("Failure during encoding of depth image")
+        if cv_rgb_image is None:
+            print("Failure during encoding of rgb image")
+
+        # Convert to sensor_msgs/Image
+        ros_rgb_image = self.bridge.cv2_to_imgmsg(cv_rgb_image, encoding="passthrough")
+        ros_depth_image = self.bridge.cv2_to_imgmsg(cv_depth_image, encoding="passthrough" )
+        # cv2.imshow('rgb_img', cv_rgb_image)
+        # cv2.waitKey(2)
+        print("Calling service")
+        str_msg = String("description")
+        response = self.im_service_client(ros_rgb_image, ros_depth_image, str_msg)
+
+
+
+
+
+if __name__ == "__main__":
+    rospy.init_node('image_topic_client_py2', anonymous=True)
+    image_topic_client = ImageTopicClient()
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        print("Shutting down image_client_py2")
+    cv2.destroyAllWindows()
