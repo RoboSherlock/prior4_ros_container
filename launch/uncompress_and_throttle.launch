@@ -1,0 +1,8 @@
+<launch>
+	<!-- throttle RGB and depth -->
+		<node pkg="topic_tools" type="throttle" name="throttle_rgb" args="messages /kinect_head/rgb/image_color/compressed 1 /kinect_head/rgb/image_color_throttled/compressed" respawn="true" />
+		<node pkg="topic_tools" type="throttle" name="throttle_depth" args="messages /kinect_head/depth_registered/image_raw/compressedDepth 1 /kinect_head/depth_registered/image_raw_throttled/compressedDepth" respawn="true" />
+
+		<node pkg="image_transport" type="republish" name="republish_rgb" args="compressed in:=/kinect_head/rgb/image_color_throttled raw out:=/kinect_head/rgb/image_color/image_raw _image_transport:=compressed" respawn="true" />
+		<node pkg="image_transport" type="republish" name="republish_depth" args="compressed in:=/kinect_head/depth_registered/image_raw_throttled raw out:=/kinect_head/depth_registered/image_raw _image_transport:=compressedDepth" respawn="true" />
+	</launch>
