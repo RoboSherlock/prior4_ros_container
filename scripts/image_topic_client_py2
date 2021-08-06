@@ -33,6 +33,9 @@ service_name = "/image_service"
 rgb_topic = "/kinect_head/rgb/image_color/image_raw"
 depth_topic = "/kinect_head/depth_registered/image_raw"
 
+# resize 1280x1024 color images to 1280x960 by cropping the top part
+with_rs_image_hd_hack = True
+
 
 class ImageTopicClient:
     def __init__(self):
@@ -62,6 +65,10 @@ class ImageTopicClient:
 
         # Do OpenCV stuff if you need to
         # ...
+        if with_rs_image_hd_hack:
+            (rows,cols,channels) = cv_rgb_image.shape
+            if cols == 1280 and rows != 720: # the RS kinect bridge behavior
+                cv_rgb_image = cv_rgb_image[0:960, 0:1280]
 
         # Convert to sensor_msgs/Image
         ros_rgb_image = self.bridge.cv2_to_imgmsg(cv_rgb_image, encoding="passthrough")
