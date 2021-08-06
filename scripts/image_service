@@ -10,9 +10,12 @@ from geometry_msgs.msg import Pose
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 
+from PoseEstimator.PoseEstimator import *
+
 def shutdown_hook():
   print("Shutting down node")
 
+pose_estimation = Prior4('/home/catkin_ws/src/noetic_im_proc_container/scripts/PoseEstimator/')
 
 def handle_service_request(req):
     """This method is called when a service request is received"""
@@ -55,8 +58,8 @@ def handle_service_request(req):
     # analyze the image              #
     ##################################
 
-
-
+    rgb_image = np.stack([cv_rgb_image[...,-1],cv_rgb_image[...,-2],cv_rgb_image[...,-3]], axis=-1)
+    pose_estimation(rgb_image, cv_depth_image, verbose=10)
 
 
 
@@ -99,6 +102,7 @@ def image_service_server():
 
     # hello_str = "hello world %s" % rospy.get_time()
     # rospy.loginfo(hello_str)
+    
 
 if __name__ == '__main__':
     try:

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Written mainly for python2, as this client might be used 
 # to test the service calls from a older system with older ROS distribution
