@@ -3,7 +3,7 @@
 
 import rospy
 from std_msgs.msg import String
-from noetic_im_proc_container.srv import ImageService,ImageServiceResponse
+from prior4_ros_container.srv import ImageService,ImageServiceResponse
 from sensor_msgs.msg import RegionOfInterest
 from geometry_msgs.msg import Pose
 
@@ -15,7 +15,7 @@ from PoseEstimator.PoseEstimator import *
 def shutdown_hook():
   print("Shutting down node")
 
-pose_estimation = Prior4('/home/catkin_ws/src/noetic_im_proc_container/scripts/PoseEstimator/')
+pose_estimation = Prior4('/home/catkin_ws/src/prior4_ros_container/scripts/PoseEstimator/')
 
 def handle_service_request(req):
     """This method is called when a service request is received"""
@@ -46,8 +46,8 @@ def handle_service_request(req):
     print(f'Depth image parameters (rows,cols,pixels,type): {rows}, {cols}, {cv_depth_image.size}, {cv_depth_image.dtype}')
 
     # Write out the images for testing purposes
-    print(cv2.imwrite("/home/catkin_ws/src/noetic_im_proc_container/rgb_out.png", cv_rgb_image))
-    print(cv2.imwrite("/home/catkin_ws/src/noetic_im_proc_container/depth_out.png", cv_depth_image))
+    print(cv2.imwrite("/home/catkin_ws/src/prior4_ros_container/rgb_out.png", cv_rgb_image))
+    print(cv2.imwrite("/home/catkin_ws/src/prior4_ros_container/depth_out.png", cv_depth_image))
 
 
 

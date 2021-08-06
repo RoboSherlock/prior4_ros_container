@@ -8,7 +8,7 @@ import sys
 import rospy
 import rospkg
 import cv2
-from noetic_im_proc_container.srv import *
+from prior4_ros_container.srv import *
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
@@ -19,7 +19,7 @@ def image_service_client():
     try:
         # Load images from data dir
         rospack = rospkg.RosPack()
-        package_path = rospack.get_path('noetic_im_proc_container')
+        package_path = rospack.get_path('prior4_ros_container')
         data_path = package_path + '/data/'
         cv_rgb_image = cv2.imread(data_path + 'test_rgb.png')
         cv_depth_image = cv2.imread(data_path + 'test_depth.png',cv2.IMREAD_ANYDEPTH)

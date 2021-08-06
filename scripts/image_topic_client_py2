@@ -13,7 +13,7 @@ import rospy
 import rospkg
 import cv2
 import message_filters
-from noetic_im_proc_container.srv import *
+from prior4_ros_container.srv import *
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image, CompressedImage
 from std_msgs.msg import String
@@ -23,7 +23,7 @@ import cv2
 
 
 # If you start with the usual bag files we have for PR2 (compressed images for rgb and depth only), please start this command before running this script:
-#   roslaunch noetic_im_proc_container uncompress_and_throttle.launch
+#   roslaunch prior4_ros_container uncompress_and_throttle.launch
 #
 #   Rationale: In bag files, we only have compressed image. The compressed image decoding method from cvbridge fails to interpret the depth image.
 #              This is why we'll decode them first.
