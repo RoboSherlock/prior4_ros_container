@@ -14,6 +14,10 @@ from Prior4PE.Prior4 import *
 from Prior4PE import PriorDecl
 from scipy.spatial.transform import Rotation
 
+import tf as ros_tf
+
+# listener = None
+
 def shutdown_hook():
   print("Shutting down node")
 
@@ -55,8 +59,19 @@ def handle_service_request(req):
     print(cv2.imwrite("/home/catkin_ws/src/prior4_ros_container/depth_out.png", cv_depth_image))
 
 
+    (trans,rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/upper_compartment", rospy.Time(0))
 
+    print("Looked up transform: ")
+    print(trans)
+    print(rot)
 
+#Example:
+#     [0.0409228400354783, 0.27642242629640124, 1.4659930943695996]
+# [-0.37528362803883986, -0.8220588219169078, 0.38714850180600885, -0.1830233028440747]
+
+    prior = PriorDecl.examplePrior
+    prior["planeRotation"] = prior["informationPerPrior"] * [Rotation.from_quat(rot)]
+    prior["planeTranslation"] = prior["informationPerPrior"] * [np.array(trans)]
 
     ##################################
     # Here you can call your code to #
@@ -64,7 +79,9 @@ def handle_service_request(req):
     ##################################
 
     rgb_image = np.stack([cv_rgb_image[...,-1],cv_rgb_image[...,-2],cv_rgb_image[...,-3]], axis=-1)
-    priors = PriorDecl.prepare_prior(PriorDecl.examplePrior)
+    # priors = PriorDecl.prepare_prior(PriorDecl.examplePrior)\
+
+    priors = PriorDecl.prepare_prior(prior)
     pose_outputs, bbs, label_image = pose_estimation(rgb_image, cv_depth_image, priors=priors)
 
     #################################
@@ -85,16 +102,15 @@ def handle_service_request(req):
 
     # Instantiate and fill a pose
     countOfPriors = priors[-1].shape[1]
-    # rgb_poses_with_prior = [po[1][0,4+(po[2][0,4:4+countOfPriors*2] if po[0].argmax() < 1 else po[2][0,4:4+countOfPriors]).argmin()] for po in pose_outputs]\
+    rgb_poses_with_prior = [po[1][0,4+(po[2][0,4:4+countOfPriors*2] if po[0].argmax() < 1 else po[2][0,4:4+countOfPriors]).argmin()] for po in pose_outputs]\
 
     rgb_poses = [po[1][0,0] for po in pose_outputs]
     rgbd_poses = [po[1][0,2] for po in pose_outputs]
     
     poses_res = [] #[Pose(p[:3,3], Rotation.from_matrix(p[:3,:3]).as_quat()) for p in rgb_poses_with_prior]
-    # for pose in rgb_poses_with_prior:\
-
+    for pose in rgb_poses_with_prior:
     # for pose in rgb_poses:
-    for pose in rgbd_poses:
+    # for pose in rgbd_poses:
       t = pose[:3,3]/1000
       R_quat = Rotation.from_matrix(pose[:3,:3]).as_quat()
 
@@ -125,6 +141,9 @@ def image_service_server():
     # pub = rospy.Publisher('chatter', String, queue_size=10)
     rospy.init_node('image_service_node')
     s = rospy.Service('image_service', ImageService, handle_service_request)
+    global listener
+    listener = ros_tf.TransformListener()
+
     rospy.on_shutdown(shutdown_hook)
     print("Ready to accept image processing requests")
     rospy.spin()

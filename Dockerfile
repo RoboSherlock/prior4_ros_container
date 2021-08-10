@@ -4,7 +4,7 @@
 # will install a ubuntu 20.04
 FROM ros:noetic
 
-RUN apt update && apt install -y tmux vim ros-noetic-cv-bridge python3-pip git-all git-lfs
+RUN apt update && apt install -y tmux vim ros-noetic-tf ros-noetic-cv-bridge python3-pip git-all git-lfs
 RUN git lfs install
 
 RUN mkdir -p /home/catkin_ws/python_src
