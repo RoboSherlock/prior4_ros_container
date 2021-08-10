@@ -4,10 +4,13 @@
 # will install a ubuntu 20.04
 FROM ros:noetic
 
-RUN apt update && apt install -y tmux vim ros-noetic-cv-bridge python3-pip
+RUN apt update && apt install -y tmux vim ros-noetic-cv-bridge python3-pip git-all git-lfs
+RUN git lfs install
 
-COPY scripts /tmp/scripts
-RUN pip install /tmp/scripts
+RUN mkdir -p /home/catkin_ws/python_src
+WORKDIR /home/catkin_ws/python_src
+RUN git clone "https://github.com/RoboSherlock/prior4_detection.git"
+RUN pip install /home/catkin_ws/python_src/prior4_detection
 
 RUN echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
 RUN mkdir -p /home/catkin_ws/src

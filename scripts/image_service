@@ -10,12 +10,16 @@ from geometry_msgs.msg import Pose
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 
-from PoseEstimator.PoseEstimator import *
+from Prior4PE.Prior4 import *
+from Prior4PE import PriorDecl
 
 def shutdown_hook():
   print("Shutting down node")
 
-pose_estimation = Prior4('/home/catkin_ws/src/prior4_ros_container/scripts/PoseEstimator/')
+pose_estimation = Prior4({
+  "data_path": "/home/catkin_ws/python_src/prior4_detection/",
+  "verbose": 10
+})
 
 def handle_service_request(req):
     """This method is called when a service request is received"""
@@ -59,7 +63,8 @@ def handle_service_request(req):
     ##################################
 
     rgb_image = np.stack([cv_rgb_image[...,-1],cv_rgb_image[...,-2],cv_rgb_image[...,-3]], axis=-1)
-    pose_estimation(rgb_image, cv_depth_image, verbose=10)
+    priors = PriorDecl.prepare_prior(PriorDecl.examplePrior)
+    pose_estimation(rgb_image, cv_depth_image, priors=priors)
 
 
 
