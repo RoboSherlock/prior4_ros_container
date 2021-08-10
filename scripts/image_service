@@ -74,22 +74,28 @@ def handle_service_request(req):
     response.success = True
 
     # x,y, height, width, (do_rectify)
-    response.bounding_boxes = [RegionOfInterest(int(bb[0] - bb[2]/2), int(bb[1] - bb[3]/2), int(bb[2]), int(bb[3]),False) for bb in bbs]#[RegionOfInterest(1,2,3,4,False)]
+    response.bounding_boxes = [RegionOfInterest(int(bb[0] - bb[2]/2)*2, int(bb[1] - bb[3]/2)*2, int(bb[2])*2, int(bb[3])*2,False) for bb in bbs]#[RegionOfInterest(1,2,3,4,False)]
 
     response.class_ids = [po[0].argmax() for po in pose_outputs]#[0,1]
     response.class_confidences = [po[0].max() for po in pose_outputs]
 
     # TODO insert your own openCV mat here that you want to return
-    ros_segmentation_image = bridge.cv2_to_imgmsg(label_image.astype(np.uint8)[...,np.newaxis], encoding="passthrough")
+    ros_segmentation_image = bridge.cv2_to_imgmsg(255*(label_image > 0).astype(np.uint8)[...,np.newaxis], encoding="passthrough")
     response.segmentation_mask = ros_segmentation_image
 
     # Instantiate and fill a pose
     countOfPriors = priors[-1].shape[1]
-    rgb_poses_with_prior = [po[1][0,4+(po[2][0,4:4+countOfPriors*2] if po[0].argmax() < 1 else po[2][0,4:4+countOfPriors]).argmin()] for po in pose_outputs]
+    # rgb_poses_with_prior = [po[1][0,4+(po[2][0,4:4+countOfPriors*2] if po[0].argmax() < 1 else po[2][0,4:4+countOfPriors]).argmin()] for po in pose_outputs]\
+
+    rgb_poses = [po[1][0,0] for po in pose_outputs]
+    rgbd_poses = [po[1][0,2] for po in pose_outputs]
     
     poses_res = [] #[Pose(p[:3,3], Rotation.from_matrix(p[:3,:3]).as_quat()) for p in rgb_poses_with_prior]
-    for pose in rgb_poses_with_prior:
-      t = pose[:3,3]
+    # for pose in rgb_poses_with_prior:\
+
+    # for pose in rgb_poses:
+    for pose in rgbd_poses:
+      t = pose[:3,3]/1000
       R_quat = Rotation.from_matrix(pose[:3,:3]).as_quat()
 
       p = Pose()
