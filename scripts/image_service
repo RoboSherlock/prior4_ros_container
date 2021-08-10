@@ -10,12 +10,17 @@ from geometry_msgs.msg import Pose
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 
-from PoseEstimator.PoseEstimator import *
+from Prior4PE.Prior4 import *
+from Prior4PE import PriorDecl
+from scipy.spatial.transform import Rotation
 
 def shutdown_hook():
   print("Shutting down node")
 
-pose_estimation = Prior4('/home/catkin_ws/src/prior4_ros_container/scripts/PoseEstimator/')
+pose_estimation = Prior4({
+  "data_path": '/home/catkin_ws/python_src/prior4_detection/',
+  "verbose": 10
+})
 
 def handle_service_request(req):
     """This method is called when a service request is received"""
@@ -59,9 +64,8 @@ def handle_service_request(req):
     ##################################
 
     rgb_image = np.stack([cv_rgb_image[...,-1],cv_rgb_image[...,-2],cv_rgb_image[...,-3]], axis=-1)
-    pose_estimation(rgb_image, cv_depth_image, verbose=10)
-
-
+    priors = PriorDecl.prepare_prior(PriorDecl.examplePrior)
+    pose_outputs, bbs, label_image = pose_estimation(rgb_image, cv_depth_image, priors=priors)
 
     #################################
     # Creating the service response #
@@ -70,26 +74,45 @@ def handle_service_request(req):
     response.success = True
 
     # x,y, height, width, (do_rectify)
-    response.bounding_boxes = [RegionOfInterest(1,2,3,4,False)]
+    response.bounding_boxes = [RegionOfInterest(int(bb[0] - bb[2]/2), int(bb[1] - bb[3]/2), int(bb[2]), int(bb[3]),False) for bb in bbs]#[RegionOfInterest(1,2,3,4,False)]
 
-    response.class_ids = [0,1]
-    response.class_confidences = [0.5, 0.5]
+    response.class_ids = [po[0].argmax() for po in pose_outputs]#[0,1]
+    response.class_confidences = [po[0].max() for po in pose_outputs]
 
     # TODO insert your own openCV mat here that you want to return
-    ros_segmentation_image = bridge.cv2_to_imgmsg(cv_rgb_image, encoding="passthrough")
+    ros_segmentation_image = bridge.cv2_to_imgmsg(label_image.astype(np.uint8)[...,np.newaxis], encoding="passthrough")
     response.segmentation_mask = ros_segmentation_image
 
     # Instantiate and fill a pose
-    p1 = Pose()
-    p1.position.x = 1
-    p1.position.y = 2
-    p1.position.z = 3
-    p1.orientation.x = 1
-    p1.orientation.y = 2
-    p1.orientation.z = 3
-    p1.orientation.w = 4
+    countOfPriors = priors[-1].shape[1]
+    rgb_poses_with_prior = [po[1][0,4+(po[2][0,4:4+countOfPriors*2] if po[0].argmax() < 1 else po[2][0,4:4+countOfPriors]).argmin()] for po in pose_outputs]
+    
+    poses_res = [] #[Pose(p[:3,3], Rotation.from_matrix(p[:3,:3]).as_quat()) for p in rgb_poses_with_prior]
+    for pose in rgb_poses_with_prior:
+      t = pose[:3,3]
+      R_quat = Rotation.from_matrix(pose[:3,:3]).as_quat()
 
-    response.pose_results = [p1]
+      p = Pose()
+      p.position.x = t[0]
+      p.position.y = t[1]
+      p.position.z = t[2]
+      p.orientation.x = R_quat[0]
+      p.orientation.y = R_quat[1]
+      p.orientation.z = R_quat[2]
+      p.orientation.w = R_quat[-1]
+
+      poses_res.append(p)
+    
+    # p1 = Pose()
+    # p1.position.x = 1
+    # p1.position.y = 2
+    # p1.position.z = 3
+    # p1.orientation.x = 1
+    # p1.orientation.y = 2
+    # p1.orientation.z = 3
+    # p1.orientation.w = 4
+
+    response.pose_results = poses_res
     return response
 
 def image_service_server():
