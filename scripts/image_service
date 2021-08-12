@@ -59,19 +59,34 @@ def handle_service_request(req):
     print(cv2.imwrite("/home/catkin_ws/src/prior4_ros_container/depth_out.png", cv_depth_image))
 
 
-    (trans,rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/upper_compartment", rospy.Time(0))
+    (ulp_trans, ulp_rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/upper_left_plates", rospy.Time(0))
+    (ulpv_trans, ulpv_rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/upper_left_plates_vert", rospy.Time(0))
+
+    (lfp_trans, lfp_rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/lower_front_plates", rospy.Time(0))
+    (lfpv_trans, lfpv_rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/lower_front_plates_vert", rospy.Time(0))
 
     print("Looked up transform: ")
-    print(trans)
-    print(rot)
+    print(ulp_trans)
+    print(ulp_rot)
 
 #Example:
 #     [0.0409228400354783, 0.27642242629640124, 1.4659930943695996]
 # [-0.37528362803883986, -0.8220588219169078, 0.38714850180600885, -0.1830233028440747]
 
     prior = PriorDecl.examplePrior
-    prior["planeRotation"] = prior["informationPerPrior"] * [Rotation.from_quat(rot)]
-    prior["planeTranslation"] = prior["informationPerPrior"] * [np.array(trans)]
+    prior["countOfPriors"] = 2
+    prior["informationPerPrior"] = 3
+
+    prior["planeRotation"] = [Rotation.from_quat(ulp_rot)] + [Rotation.from_quat(ulpv_rot)] * 2 + [Rotation.from_quat(lfp_rot)] + [Rotation.from_quat(lfpv_rot)] * 2
+    prior["planeTranslation"] = [np.array(ulp_trans)] + [np.array(ulpv_trans)] * 2 + [np.array(lfp_trans)] + [np.array(lfpv_trans)] * 2
+
+    prior["point"] = np.array([0,0,0, 0,0,0, 0,0,100] * 2).reshape(1, prior["countOfPriors"], prior["informationPerPrior"], 3)
+    prior["pointd"] = np.array([0] * 2 * 3).reshape(1, prior["countOfPriors"], prior["informationPerPrior"], )
+
+    prior["pointw"] = np.array([1./30., 1./100., 1./100.] * 2).reshape(1, prior["countOfPriors"], prior["informationPerPrior"], )
+
+
+
 
     ##################################
     # Here you can call your code to #
@@ -93,16 +108,22 @@ def handle_service_request(req):
     # x,y, height, width, (do_rectify)
     response.bounding_boxes = [RegionOfInterest(int(bb[0] - bb[2]/2)*2, int(bb[1] - bb[3]/2)*2, int(bb[2])*2, int(bb[3])*2,False) for bb in bbs]#[RegionOfInterest(1,2,3,4,False)]
 
-    response.class_ids = [po[0].argmax() for po in pose_outputs]#[0,1]
-    response.class_confidences = [po[0].max() for po in pose_outputs]
+    response.class_ids = [po[0].argmax() * 2 for po in pose_outputs]#[0,1]
+
+    #if plate and big then declare so
+    for j, cid in enumerate(response.class_ids):
+      print('pose_outputs[j][2][0,4:4+prior["countOfPriors"]*2].argmin()', pose_outputs[j][2][0,4:4+prior["countOfPriors"]*2].argmin())
+      if cid < 2 and pose_outputs[j][2][0,4:4+prior["countOfPriors"]*2].argmin() >= prior["countOfPriors"]:
+        response.class_ids[j] += 1
+
+    response.class_confidences = [1.0 / (po[2][0,4:4+prior["countOfPriors"]*2] if po[0].argmax() < 1 else po[2][0,4:4+prior["countOfPriors"]]).min() for po in pose_outputs]
 
     # TODO insert your own openCV mat here that you want to return
     ros_segmentation_image = bridge.cv2_to_imgmsg(255*(label_image > 0).astype(np.uint8)[...,np.newaxis], encoding="passthrough")
     response.segmentation_mask = ros_segmentation_image
 
     # Instantiate and fill a pose
-    countOfPriors = priors[-1].shape[1]
-    rgb_poses_with_prior = [po[1][0,4+(po[2][0,4:4+countOfPriors*2] if po[0].argmax() < 1 else po[2][0,4:4+countOfPriors]).argmin()] for po in pose_outputs]\
+    rgb_poses_with_prior = [po[1][0,4+(po[2][0,4:4+prior["countOfPriors"]*2] if po[0].argmax() < 1 else po[2][0,4:4+prior["countOfPriors"]]).argmin()] for po in pose_outputs]
 
     rgb_poses = [po[1][0,0] for po in pose_outputs]
     rgbd_poses = [po[1][0,2] for po in pose_outputs]
