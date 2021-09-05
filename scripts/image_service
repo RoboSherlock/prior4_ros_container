@@ -15,6 +15,7 @@ from Prior4PE import PriorDecl
 from scipy.spatial.transform import Rotation
 
 import tf as ros_tf
+import datetime
 
 # listener = None
 
@@ -23,8 +24,51 @@ def shutdown_hook():
 
 pose_estimation = Prior4({
   "data_path": '/home/catkin_ws/python_src/prior4_detection/',
-  "verbose": 10
+  "seg_model_name": "models/bb_frame_prediction",
+  "pose_model_name": "models/pred_prio_model_fixed_zcorr_nosegin__2",
+  "verbose": 0
 })
+
+def addtofile(filename, list):
+    with open(filename, "a") as output:
+        output.write( "\n")
+        output.write(str(datetime.datetime.now()) + "\n")
+        for a in list:
+            output.write(str(a) + "\n")
+        output.write( "\n")
+
+def make_Prior(list_of_lists_namePdw):
+    prior = {}
+    prior["countOfPriors"] = len(list_of_lists_namePdw)
+    prior["informationPerPrior"] = max(len(_) for _ in list_of_lists_namePdw)
+    
+    prior["planeRotation"] = []#np.zeros((1, prior["countOfPriors"], prior["informationPerPrior"],3,3))
+    prior["planeTranslation"] = []#np.zeros((1, prior["countOfPriors"], prior["informationPerPrior"],3))
+    
+    prior["point"] = np.zeros((1, prior["countOfPriors"], prior["informationPerPrior"],3))
+    prior["pointd"] = np.zeros((1, prior["countOfPriors"], prior["informationPerPrior"]))
+    prior["priorw"] = np.zeros((1, prior["countOfPriors"], prior["informationPerPrior"]))
+    
+    for li, list_namePdw in enumerate(list_of_lists_namePdw):
+        for lj, (name, P, d, w) in enumerate(list_namePdw):
+            if name == "example":
+                R = [-0.55142, -0.391561, 0.660581,   0.325942]
+                t = [-0.0457627, -0.217613, 1.23532]
+            else:
+                (t, R) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", f"dishwasher/{name}", rospy.Time(0))
+            prior["planeRotation"] += [Rotation.from_quat(R)]
+            prior["planeTranslation"] += [np.array(t)]              
+            
+            prior["point"][0,li,lj] = P
+            prior["pointd"][0,li,lj] = d
+            prior["priorw"][0,li,lj] = w
+            
+        while(len(prior["planeRotation"]) < (li+1) * prior["informationPerPrior"]):
+            prior["planeRotation"] += [prior["planeRotation"][-1]]
+            prior["planeTranslation"] += [prior["planeTranslation"][-1]]
+    
+    return prior
+
 
 def handle_service_request(req):
     """This method is called when a service request is received"""
@@ -55,15 +99,26 @@ def handle_service_request(req):
     print(f'Depth image parameters (rows,cols,pixels,type): {rows}, {cols}, {cv_depth_image.size}, {cv_depth_image.dtype}')
 
     # Write out the images for testing purposes
-    print(cv2.imwrite("/home/catkin_ws/src/prior4_ros_container/rgb_out.png", cv_rgb_image))
+    #print(cv2.imwrite(f"/home/catkin_ws/src/prior4_ros_container/imagesrgb/{str(datetime.datetime.now())}.png", cv_rgb_image))
     print(cv2.imwrite("/home/catkin_ws/src/prior4_ros_container/depth_out.png", cv_depth_image))
 
+#    def declare_priors(list_of_list_of_quadruple):
+#      prior = {}
+#      prior["countOfPriors"] = len(list_of_list_of_quadruple)
+#      prior["informationPerPrior"] = max([])
 
+#      if len(list_of_quadruple) > prior["informationPerPrior"]:
+#        for 
+#      for (tf_plane_name, point, d, w) in list_of_quadruple:
+        
+      
     (ulp_trans, ulp_rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/upper_left_plates", rospy.Time(0))
     (ulpv_trans, ulpv_rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/upper_left_plates_vert", rospy.Time(0))
 
     (lfp_trans, lfp_rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/lower_front_plates", rospy.Time(0))
     (lfpv_trans, lfpv_rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/lower_front_plates_vert", rospy.Time(0))
+
+    (um_trans, um_rot) = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/upper_mug", rospy.Time(0))
 
     print("Looked up transform: ")
     print(ulp_trans)
@@ -73,18 +128,78 @@ def handle_service_request(req):
 #     [0.0409228400354783, 0.27642242629640124, 1.4659930943695996]
 # [-0.37528362803883986, -0.8220588219169078, 0.38714850180600885, -0.1830233028440747]
 
+    #      "tf plane name"         object point    distance   weight
+#    prior = declare_priors([
+#      [
+#        ("upper_left_plates",       np.array([0,0,0]),     0,     1./30.), 
+#        ("upper_left_plates_vert",  np.array([0,0,0]),    0,     1./200.), 
+#        ("upper_left_plates_vert",  np.array([0,0,0]),    0,     0.)      
+#      ],
+#      [
+#        ("lower_front_plates",       np.array([0,0,0]),    0,     1./30.),   
+#        ("lower_front_plates_vert",  np.array([0,0,0]),    0,     1./200.),    
+#        ("lower_front_plates_vert",  np.array([0,0,0]),    0,        0.)  
+#      ]
+#    ])
+
     prior = PriorDecl.examplePrior
-    prior["countOfPriors"] = 2
+    prior["countOfPriors"] = 3
     prior["informationPerPrior"] = 3
 
-    prior["planeRotation"] = [Rotation.from_quat(ulp_rot)] + [Rotation.from_quat(ulpv_rot)] * 2 + [Rotation.from_quat(lfp_rot)] + [Rotation.from_quat(lfpv_rot)] * 2
-    prior["planeTranslation"] = [np.array(ulp_trans)] + [np.array(ulpv_trans)] * 2 + [np.array(lfp_trans)] + [np.array(lfpv_trans)] * 2
+    prior["planeRotation"] = [Rotation.from_quat(ulp_rot)] + [Rotation.from_quat(ulpv_rot)] * 2 + [Rotation.from_quat(lfp_rot)] + [Rotation.from_quat(lfpv_rot)] * 2 + [Rotation.from_quat(um_rot)] * 3
+    prior["planeTranslation"] = [np.array(ulp_trans)] + [np.array(ulpv_trans)] * 2 + [np.array(lfp_trans)] + [np.array(lfpv_trans)] * 2 + [np.array(um_trans)] * 3
 
-    prior["point"] = np.array([0,0,0, 0,0,0, 0,0,1000] * 2).reshape(1, prior["countOfPriors"], prior["informationPerPrior"], 3)
-    prior["pointd"] = np.array([0] * 2 * 3).reshape(1, prior["countOfPriors"], prior["informationPerPrior"], )
+    prior["point"] = np.array([0,0,0, 0,0,0, 0,0,1000] * 3).reshape(1, prior["countOfPriors"], prior["informationPerPrior"], 3)
+    prior["pointd"] = np.array([0] * 3 * 3).reshape(1, prior["countOfPriors"], prior["informationPerPrior"], )
 
-    prior["pointw"] = np.array([1./30., 0., 0.] * 2).reshape(1, prior["countOfPriors"], prior["informationPerPrior"], )
+    prior["pointw"] = np.array([1./30., 0., 0.] * 3).reshape(1, prior["countOfPriors"], prior["informationPerPrior"], )
 
+    print('prior', prior)
+
+    
+    prior = make_Prior(
+    [
+        [("upper_left_plates", [0,0,0], 0,  1./30.),
+         ("upper_left_plates_vert", [0,0,1000], 0,  1./100.)],
+
+        [("lower_front_plates", [0,0,0], 0,  1./30.),
+	 ("lower_front_plates_vert", [0,0,1000], 0,  1./200.)],
+
+#        [("upper_mug", [0,0,0], 0,  1./30.),
+#         ("upper_mug", [0,0,100], -100,  1./60.)],
+
+#        [("l_gripper_tool_frame_vert", [0,0,0], 5.,  1./10.),
+#         ("l_gripper_tool_frame_vert", [0,0,100], 100.,  1./50.)],
+
+#        [("l_gripper_tool_frame_vert", [0,0,0], -5.,  1./10.),
+#         ("l_gripper_tool_frame_vert", [0,0,100], -100.,  1./50.)],
+
+#        [("r_gripper_tool_frame_vert", [0,0,0], 5.,  1./10.),
+#         ("r_gripper_tool_frame_vert", [0,0,100], 100.,  1./50.)],
+
+#        [("r_gripper_tool_frame_vert", [0,0,0], -5.,  1./10.),
+#         ("r_gripper_tool_frame_vert", [0,0,100], -100.,  1./50.)],
+
+        [("l_gripper_tool_frame_vert", [0,0,0], 40.,  1./10.),
+         ("l_gripper_tool_frame_vert", [0,0,100], 40.,  1./10.),
+         ("l_gripper_tool_frame_vert2", [0,0,0], 45.,  1./20.),
+         ("l_gripper_tool_frame_vert2", [0,0,100], 100-45.,  1./20.)],
+
+        [("l_gripper_tool_frame_vert", [0,0,0], -40.,  1./10.),
+         ("l_gripper_tool_frame_vert", [0,0,100], -40.,  1./20.),
+         ("l_gripper_tool_frame_vert2", [0,0,0], 45.,  1./20.),
+         ("l_gripper_tool_frame_vert2", [0,0,100], 100-45.,  1./20.)],
+
+        [("r_gripper_tool_frame_vert", [0,0,0], 40.,  1./10.),
+         ("r_gripper_tool_frame_vert", [0,0,100], 40.,  1./20.),
+         ("r_gripper_tool_frame_vert2", [0,0,0], 45.,  1./20.),
+         ("r_gripper_tool_frame_vert2", [0,0,100], 100-45.,  1./20.)],
+
+        [("r_gripper_tool_frame_vert", [0,0,0], -40.,  1./10.),
+         ("r_gripper_tool_frame_vert", [0,0,100], -40.,  1./20.),
+         ("r_gripper_tool_frame_vert2", [0,0,0], 45.,  1./20.),
+         ("r_gripper_tool_frame_vert2", [0,0,100], 100-45.,  1./20.)]
+    ])
     print('prior', prior)
 
 
@@ -97,7 +212,9 @@ def handle_service_request(req):
     # priors = PriorDecl.prepare_prior(PriorDecl.examplePrior)\
 
     priors = PriorDecl.prepare_prior(prior)
-    pose_outputs, bbs, label_image = pose_estimation(rgb_image, cv_depth_image, priors=priors)
+    lookatt,_ = listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/lower_front_plates", rospy.Time(0))
+    print("lookatt",lookatt)
+    pose_outputs, bbs, label_image = pose_estimation(rgb_image, cv_depth_image, priors=priors)#, lookAt_t=np.array(lookatt)*1000)
 
     #################################
     # Creating the service response #
@@ -117,6 +234,7 @@ def handle_service_request(req):
         response.class_ids[j] += 1
 
     response.class_confidences = [1.0 / (po[2][0,4:4+prior["countOfPriors"]*2] if po[0].argmax() < 1 else po[2][0,4:4+prior["countOfPriors"]]).min() for po in pose_outputs]
+    # response.class_confidences = [1.0 for po in pose_outputs]
 
     # TODO insert your own openCV mat here that you want to return
     ros_segmentation_image = bridge.cv2_to_imgmsg(255*(label_image > 0).astype(np.uint8)[...,np.newaxis], encoding="passthrough")
@@ -130,12 +248,17 @@ def handle_service_request(req):
 
     rgb_poses = [po[1][0,0] for po in pose_outputs]
     rgbd_poses = [po[1][0,2] for po in pose_outputs]
+
+    print("RGB - PRIOR DIFF")
+    for ip, p in enumerate(rgb_poses):
+      print(p[2,3], rgb_poses_with_prior[ip][2,3], p[2,3] - rgb_poses_with_prior[ip][2,3], p[2,3] / rgb_poses_with_prior[ip][2,3], rgb_poses_with_prior[ip][2,3] / p[2,3])
     
     poses_res = [] #[Pose(p[:3,3], Rotation.from_matrix(p[:3,:3]).as_quat()) for p in rgb_poses_with_prior]
     for pose in rgb_poses_with_prior:
     # for pose in rgb_poses:
     # for pose in rgbd_poses:
       t = pose[:3,3]/1000
+      #change_Angle_around_Axis(axis, x, v_zero, factor
       R_quat = Rotation.from_matrix(pose[:3,:3]).as_quat()
 
       p = Pose()
@@ -157,6 +280,12 @@ def handle_service_request(req):
     # p1.orientation.y = 2
     # p1.orientation.z = 3
     # p1.orientation.w = 4
+
+
+    write_file = "/home/catkin_ws/src/prior4_ros_container/output.csv"
+    addtofile(write_file, ["dwincam", listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "dishwasher/origin", rospy.Time(0)),"lefthandincam", listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "l_gripper_tool_frame", rospy.Time(0)),"righthandincam", listener.lookupTransform("head_mount_kinect_rgb_optical_frame", "r_gripper_tool_frame", rospy.Time(0)), "rgb_poses", rgb_poses, "rgbd_poses", rgbd_poses, "rgb_poses_with_prior", rgb_poses_with_prior, "response.class_ids", response.class_ids])
+
+    print(cv2.imwrite(f"/home/catkin_ws/src/prior4_ros_container/imagesrgb/{str(datetime.datetime.now())}.png", cv_rgb_image))
 
     response.pose_results = poses_res
     return response
